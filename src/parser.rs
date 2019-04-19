@@ -35,7 +35,7 @@ named!(parse_filename_string<CompleteStr, CompleteStr>,
 named!(parse_path_component_string<CompleteStr, CompleteStr>,
     recognize!(
         do_parse!(
-            component: parse_filename_string >>
+            parse_filename_string >>
             tag!("/") >>
             ()
         )
@@ -45,8 +45,8 @@ named!(parse_path_component_string<CompleteStr, CompleteStr>,
 named!(parse_resource_directory_string<CompleteStr, CompleteStr>,
     recognize!(
         do_parse!(
-            parent_dirs: many1!(parse_path_component_string) >>
-            dir: parse_path_component_string >>
+            _parent_dirs: many1!(parse_path_component_string) >>
+            _dir: parse_path_component_string >>
             ()
         )
     )
@@ -55,8 +55,8 @@ named!(parse_resource_directory_string<CompleteStr, CompleteStr>,
 named!(parse_resource_filename_string<CompleteStr, CompleteStr>,
     recognize!(
         do_parse!(
-            parent_dirs: many1!(parse_path_component_string) >>
-            file: parse_filename_string >>
+            _parent_dirs: many1!(parse_path_component_string) >>
+            _file: parse_filename_string >>
             ()
         )
     )
@@ -189,7 +189,7 @@ named!(parse_raw_command<CompleteStr, IdemRawCommandType>,
     )
 );
 
-named!(parse_raw_script<CompleteStr, Vec<IdemRawCommandType>>,
+named!(pub parse_raw_script<CompleteStr, Vec<IdemRawCommandType>>,
     call!(parse_raw_statements)
 );
 
