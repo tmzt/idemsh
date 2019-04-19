@@ -1,5 +1,6 @@
 
 use nom::types::CompleteStr;
+use nom::anychar;
 
 #[macro_use]
 use super::ast::*;
@@ -14,58 +15,30 @@ named!(parse_identifier<CompleteStr, CompleteStr>,
     )
 );
 
-named!(parse_path<CompleteStr, CompleteStr>,
-    recognize!(
-        do_parse!(
-            many1!(one_of!("_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.@:/*\\")) >>
-            ()
-        )
-    )
-);
+named!(parse_path<CompleteStr, IdemPath>,
+    do_parse!(
+        s: many1!(one_of!("_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.\\/")) >>
+        ({
+            let s: String = s.into_iter().collect();
+            eprintln!("Got path: '{}'", s);
 
-named!(parse_filename_string<CompleteStr, CompleteStr>,
-    recognize!(
-        do_parse!(
-            many1!(one_of!("_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.\\")) >>
-            ()
-        )
-    )
-);
-
-named!(parse_path_component_string<CompleteStr, CompleteStr>,
-    recognize!(
-        do_parse!(
-            parse_filename_string >>
-            tag!("/") >>
-            ()
-        )
-    )
-);
-
-named!(parse_resource_directory_string<CompleteStr, CompleteStr>,
-    recognize!(
-        do_parse!(
-            _parent_dirs: many1!(parse_path_component_string) >>
-            _dir: parse_path_component_string >>
-            ()
-        )
-    )
-);
-
-named!(parse_resource_filename_string<CompleteStr, CompleteStr>,
-    recognize!(
-        do_parse!(
-            _parent_dirs: many1!(parse_path_component_string) >>
-            _file: parse_filename_string >>
-            ()
-        )
+            if s.ends_with("/") {
+                IdemPath(None, IdemPathLocalPartType::Directory(s.trim_right_matches('/').to_string()))
+            } else {
+                IdemPath(None, IdemPathLocalPartType::File(s))
+            }
+        })
     )
 );
 
 named!(parse_resource<CompleteStr, IdemResourceType>,
     alt_complete!(
-        map!(parse_resource_directory_string, |s| IdemResourceType::Directory(s.to_string())) |
-        map!(parse_resource_filename_string, |s| IdemResourceType::Directory(s.to_string()))
+        map!(parse_path, |IdemPath(_, s)| {
+            match s {
+                IdemPathLocalPartType::File(s) => IdemResourceType::File(s),
+                IdemPathLocalPartType::Directory(s) => IdemResourceType::Directory(s),
+            }
+        })
     )
 );
 
@@ -81,7 +54,7 @@ named!(parse_value_litstring<CompleteStr, IdemValueType>,
 named!(parse_value_path_spec<CompleteStr, IdemValueType>,
     do_parse!(
         path: ws!(parse_path) >>
-        (IdemValueType::PathSpec(path.to_string()))
+        (IdemValueType::PathSpec(path))
     )
 );
 
@@ -123,7 +96,7 @@ named!(parse_raw_command_with_paths<CompleteStr, IdemRawCommandWithPaths>,
         ws!(tag!(")")) >>
         ({
             IdemRawCommandWithPaths {
-                paths: paths.into_iter().map(|s| s.to_string()).collect(),
+                paths: paths,
                 params: params,
             }
         })
@@ -209,6 +182,42 @@ mod tests {
     );
 
     #[test]
+    fn test_parse_path1() {
+        test_parser!(
+            CompleteStr(&r"path/"),
+            parse_path,
+            IdemPath(None, IdemPathLocalPartType::Directory("path".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_parse_path2() {
+        test_parser!(
+            CompleteStr(&r"path"),
+            parse_path,
+            IdemPath(None, IdemPathLocalPartType::File("path".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_parse_path3() {
+        test_parser!(
+            CompleteStr(&r"path/to/path/"),
+            parse_path,
+            IdemPath(None, IdemPathLocalPartType::Directory("path/to/path".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_parse_path4() {
+        test_parser!(
+            CompleteStr(&r"path/to/path"),
+            parse_path,
+            IdemPath(None, IdemPathLocalPartType::File("path/to/path".to_string()))
+        );
+    }
+
+    #[test]
     fn test_parse_value_litstring() {
         test_parser!(
             CompleteStr(&r#""value""#),
@@ -218,11 +227,24 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_value_path_spec() {
+    fn test_parse_value_path_spec1() {
         test_parser!(
             CompleteStr(&r#"./path"#),
             parse_value_path_spec,
-            IdemValueType::PathSpec("./path".to_string())
+            IdemValueType::PathSpec(
+                IdemPath(None, IdemPathLocalPartType::File("./path".to_string()))
+            )
+        );
+    }
+
+    #[test]
+    fn test_parse_value_path_spec2() {
+        test_parser!(
+            CompleteStr(&r#"./path/"#),
+            parse_value_path_spec,
+            IdemValueType::PathSpec(
+                IdemPath(None, IdemPathLocalPartType::Directory("./path".to_string()))
+            )
         );
     }
 
@@ -251,8 +273,8 @@ mod tests {
             parse_raw_command_with_paths,
             IdemRawCommandWithPaths {
                 paths: vec![
-                    "./path1".to_string(),
-                    "./path2".to_string()
+                    IdemPath(None, IdemPathLocalPartType::File("./path1".to_string())),
+                    IdemPath(None, IdemPathLocalPartType::File("./path2".to_string())),
                 ],
                 params: vec![
                     IdemParamType::KeyValue("key".to_string(), IdemValueType::LitString("value".to_string()))
@@ -264,12 +286,12 @@ mod tests {
     #[test]
     fn test_parse_raw_command_with_paths2() {
         test_parser!(
-            CompleteStr(&r#"./path1 ./path2 (copied)"#),
+            CompleteStr(&r#"./path1/ ./path2/ (copied)"#),
             parse_raw_command_with_paths,
             IdemRawCommandWithPaths {
                 paths: vec![
-                    "./path1".to_string(),
-                    "./path2".to_string()
+                    IdemPath(None, IdemPathLocalPartType::Directory("./path1".to_string())),
+                    IdemPath(None, IdemPathLocalPartType::Directory("./path2".to_string())),
                 ],
                 params: vec![
                     IdemParamType::FlagKeyword("copied".to_string()),
@@ -282,7 +304,7 @@ mod tests {
     fn test_parse_raw_command_each() {
         test_parser!(
             CompleteStr(&r#"
-each i in ./dir
+each i in ./dir/
     ./a (mode="755")
     ./b (mode="600")
 end
@@ -290,11 +312,13 @@ end
             parse_raw_command_each,
             IdemRawCommandType::Each(
                 "i".to_string(),
-                IdemValueType::PathSpec("./dir".to_string()),
+                IdemValueType::PathSpec(
+                    IdemPath(None, IdemPathLocalPartType::Directory("./dir".to_string()))
+                ),
                 vec![
                     Box::new(IdemRawCommandType::WithPaths(IdemRawCommandWithPaths {
                         paths: vec![
-                            "./a".to_string(),
+                            IdemPath(None, IdemPathLocalPartType::File("./a".to_string())),
                         ],
                         params: vec![
                             IdemParamType::KeyValue("mode".to_string(), IdemValueType::LitString("755".to_string()))
@@ -302,7 +326,7 @@ end
                     })),
                     Box::new(IdemRawCommandType::WithPaths(IdemRawCommandWithPaths {
                         paths: vec![
-                            "./b".to_string(),
+                            IdemPath(None, IdemPathLocalPartType::File("./b".to_string())),
                         ],
                         params: vec![
                             IdemParamType::KeyValue("mode".to_string(), IdemValueType::LitString("600".to_string()))
@@ -317,8 +341,8 @@ end
     fn test_parse_raw_command_with_block() {
         test_parser!(
             CompleteStr(&r#"
-with ./dir
-    ./child (exists)
+with ./dir/
+    ./child/ (exists)
 end
 "#),
             parse_raw_command_with_block,
@@ -328,7 +352,7 @@ end
                 vec![
                     Box::new(IdemRawCommandType::WithPaths(IdemRawCommandWithPaths {
                         paths: vec![
-                            "./child".to_string(),
+                            IdemPath(None, IdemPathLocalPartType::Directory("./child".to_string())),
                         ],
                         params: vec![
                             IdemParamType::FlagKeyword("exists".to_string()),
@@ -343,21 +367,23 @@ end
     fn test_parse_raw_script1() {
         test_parser!(
             CompleteStr(&r#"
-each i in ./dir
+each i in ./dir/
     ./a (mode="755")
     ./b (mode="600")
 end
-./x ./y (copied)
+./x/ ./y/ (copied)
 "#),
             parse_raw_script,
             vec![
                 IdemRawCommandType::Each(
                     "i".to_string(),
-                    IdemValueType::PathSpec("./dir".to_string()),
+                    IdemValueType::PathSpec(
+                        IdemPath(None, IdemPathLocalPartType::Directory("./dir".to_string()))
+                    ),
                     vec![
                         Box::new(IdemRawCommandType::WithPaths(IdemRawCommandWithPaths {
                             paths: vec![
-                                "./a".to_string(),
+                                IdemPath(None, IdemPathLocalPartType::File("./a".to_string())),
                             ],
                             params: vec![
                                 IdemParamType::KeyValue("mode".to_string(), IdemValueType::LitString("755".to_string()))
@@ -365,7 +391,7 @@ end
                         })),
                         Box::new(IdemRawCommandType::WithPaths(IdemRawCommandWithPaths {
                             paths: vec![
-                                "./b".to_string(),
+                                IdemPath(None, IdemPathLocalPartType::File("./b".to_string())),
                             ],
                             params: vec![
                                 IdemParamType::KeyValue("mode".to_string(), IdemValueType::LitString("600".to_string()))
@@ -375,8 +401,8 @@ end
                 ),
                 IdemRawCommandType::WithPaths(IdemRawCommandWithPaths {
                     paths: vec![
-                        "./x".to_string(),
-                        "./y".to_string(),
+                        IdemPath(None, IdemPathLocalPartType::Directory("./x".to_string())),
+                        IdemPath(None, IdemPathLocalPartType::Directory("./y".to_string())),
                     ],
                     params: vec![
                         IdemParamType::FlagKeyword("copied".to_string()),

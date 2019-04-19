@@ -1,5 +1,14 @@
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum IdemPathLocalPartType {
+    Directory(String),
+    File(String),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct IdemPath(pub Option<String>, pub IdemPathLocalPartType);
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum IdemResourceType {
     Directory(String),
     Host(String),
@@ -10,7 +19,7 @@ pub enum IdemResourceType {
 pub enum IdemValueType {
     LitString(String),
     ExtendedString(String),
-    PathSpec(String),
+    PathSpec(IdemPath),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -41,7 +50,7 @@ pub enum IdemParamType {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct IdemRawCommandWithPaths {
-    pub paths: Vec<String>,
+    pub paths: Vec<IdemPath>,
     pub params: Vec<IdemParamType>,
 }
 
