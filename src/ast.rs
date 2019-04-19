@@ -1,5 +1,12 @@
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum IdemResourceType {
+    Directory(String),
+    Host(String),
+    File(String),
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum IdemValueType {
     LitString(String),
     ExtendedString(String),
@@ -42,4 +49,5 @@ pub struct IdemRawCommandWithPaths {
 pub enum IdemRawCommandType {
     Each(String, IdemValueType, Vec<Box<IdemRawCommandType>>),
     WithPaths(IdemRawCommandWithPaths),
+    WithBlock(IdemResourceType, Option<String>, Vec<Box<IdemRawCommandType>>),
 }
