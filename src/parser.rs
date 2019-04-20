@@ -23,7 +23,7 @@ named!(parse_path<CompleteStr, IdemPath>,
             eprintln!("Got path: '{}'", s);
 
             if s.ends_with("/") {
-                IdemPath(None, IdemPathLocalPartType::Directory(s.trim_right_matches('/').to_string()))
+                IdemPath(None, IdemPathLocalPartType::Directory(s.trim_end_matches('/').to_string()))
             } else {
                 IdemPath(None, IdemPathLocalPartType::File(s))
             }

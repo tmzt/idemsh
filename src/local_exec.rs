@@ -53,6 +53,10 @@ fn find_single_flag_keyword(params: &[IdemParamType]) -> Option<&str> {
     }
 }
 
+fn create_ignore_existing<T: AsRef<Path>>(path: T) -> IOResult<()> {
+    fs::OpenOptions::new().create(true).write(true).open(path).map(|_| ())
+}
+
 impl LocalExec {
     pub fn execute_raw_script_command(&self, cmd: &IdemRawCommandType) -> LocalResult {
         match cmd {
@@ -62,7 +66,6 @@ impl LocalExec {
                     eprintln!("Found single flag keyword: {:?}", flag);
                     match flag.unwrap() {
                         "exists" => {
-                            // let path = find_single_path(obj.paths.iter().map(|p| &p).collect().as_slice());
                             let path = find_single_path(obj);
                             assert!(path.is_some(), "exists flag expects to follow a single path");
                             let IdemPath(_, path) = path.unwrap();
@@ -76,8 +79,11 @@ impl LocalExec {
                                         return fs::create_dir(dir);
                                     }
                                 },
-
-                                _ => unimplemented!("Path type not supported for exists")
+                                IdemPathLocalPartType::File(ref path) => {
+                                    let path = self.cwd.join(path);
+                                    eprintln!("Creating file {:?}, ignoring existing", path);
+                                    return create_ignore_existing(&path)
+                                },
                             }
                         }
 
@@ -112,16 +118,16 @@ mod tests {
     );
 
     #[test]
-    fn test_directory_exists() {
+    fn test_file_exists() {
         let script = parse!(r#"
-./a/ (exists)
+./afile (exists)
 "#);
 
         // Verify script
         assert_eq!(script, vec![
             IdemRawCommandType::WithPaths(IdemRawCommandWithPaths {
                 paths: vec![
-                    IdemPath(None, IdemPathLocalPartType::Directory("./a".to_string())),
+                    IdemPath(None, IdemPathLocalPartType::File("./afile".to_string())),
                 ],
                 params: vec![
                     IdemParamType::FlagKeyword("exists".to_string()),
@@ -130,12 +136,37 @@ mod tests {
         ]);
 
         // Execute script
-        // let local_exec = LocalExec::default();
         let local_exec = local_exec!();
-        local_exec.execute_raw_script_command(&script[0]);
+        local_exec.execute_raw_script_command(&script[0]).unwrap();
 
         // Assert result
-        assert!(Path::new("./testing/a").is_dir(), "./testing/a does not exist or is not a directory.");
+        assert!(Path::new("./testing/afile").is_file(), "./testing/afile does not exist or is not a file.");
+    }
+
+    #[test]
+    fn test_directory_exists() {
+        let script = parse!(r#"
+./adir/ (exists)
+"#);
+
+        // Verify script
+        assert_eq!(script, vec![
+            IdemRawCommandType::WithPaths(IdemRawCommandWithPaths {
+                paths: vec![
+                    IdemPath(None, IdemPathLocalPartType::Directory("./adir".to_string())),
+                ],
+                params: vec![
+                    IdemParamType::FlagKeyword("exists".to_string()),
+                ],
+            })
+        ]);
+
+        // Execute script
+        let local_exec = local_exec!();
+        local_exec.execute_raw_script_command(&script[0]).unwrap();
+
+        // Assert result
+        assert!(Path::new("./testing/adir").is_dir(), "./testing/adir does not exist or is not a directory.");
     }
 
 }
