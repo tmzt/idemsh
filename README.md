@@ -2,16 +2,17 @@
 The Idempotent Shell
 =================
 
-Goals:
-    * simple, declarative commands
-    * easy remote access and support for enumerating remote systems
-    * access powerful URI paths, including remote cloud storage such as S3
+## Goals:
+
+* simple, declarative commands
+* easy remote access and support for enumerating remote systems
+* access powerful URI paths, including remote cloud storage such as S3
 
 Single static binary, which is also used to perform commands on remote systems when scp, sftp, etc. are not enough.
 
 Built-in config file editing syntax, with smart detection for blocks.
 
-# Getting Started
+## Getting Started
 
 `idemsh` is distributed as a single static binary, but can load external plugins if available.
 
@@ -27,6 +28,6 @@ One or many paths can be provided, depending on the command.
 
 Blocks are simple, starting with a _block command_, such as `each` and ending with `end`.
 
-** Note: this program is a work in progress, not all of the features described below are implemented. `idemsh` follows symantic versioning, pre 1.0 releases may break compatbility with previous versions, though this will be kept to a minimum.
+## Planning
 
-See the PLANNING.md document for more details.
+This program is a work in progress, see the [PLANNING.md](PLANNING) document for what are doing. `idemsh` follows symantic versioning, pre 1.0 releases may break compatbility with previous versions, though this will be kept to a minimum.
