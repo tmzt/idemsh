@@ -6,12 +6,12 @@ use std::fs;
 
 use super::ast::*;
 use super::parser::*;
-
-pub type LocalResult = IOResult<()>;
+use super::traits::*;
+use super::errors::Result as ExecResult;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct LocalExec {
-    cwd: PathBuf
+    cwd: PathBuf,
 }
 
 impl Default for LocalExec {
@@ -31,6 +31,35 @@ impl LocalExec {
         LocalExec {
             cwd: cwd.to_path_buf()
         }
+    }
+}
+
+impl Exec for LocalExec {
+    fn change_directory(&mut self, dir: &str) -> ExecResult<()> {
+        Ok(())
+    }
+
+    fn ensure_directory(&mut self, local_part: &str) -> ExecResult<()> {
+        let dir = self.cwd.join(local_part);
+        eprintln!("Checking for path {:?}", dir);
+        if !dir.exists() {
+            eprintln!("Creating path {:?}", dir);
+            fs::create_dir(dir)?;
+        };
+
+        Ok(())
+    }
+
+    fn ensure_file_exists(&mut self, local_part: &str) -> ExecResult<()> {
+        Ok(())
+    }
+
+    fn ensure_file_contents(&mut self, local_part: &str, contents: FileContents) -> ExecResult<()> {
+        Ok(())
+    }
+
+    fn get_cwd(&mut self) -> ExecResult<String> {
+        Ok(self.cwd.to_str().unwrap().to_string())
     }
 }
 
@@ -57,48 +86,6 @@ fn create_ignore_existing<T: AsRef<Path>>(path: T) -> IOResult<()> {
     fs::OpenOptions::new().create(true).write(true).open(path).map(|_| ())
 }
 
-impl LocalExec {
-    pub fn execute_raw_script_command(&self, cmd: &IdemRawCommandType) -> LocalResult {
-        match cmd {
-            IdemRawCommandType::WithPaths(obj) => {
-                let flag = find_single_flag_keyword(&obj.params);
-                if flag.is_some() {
-                    eprintln!("Found single flag keyword: {:?}", flag);
-                    match flag.unwrap() {
-                        "exists" => {
-                            let path = find_single_path(obj);
-                            assert!(path.is_some(), "exists flag expects to follow a single path");
-                            let IdemPath(_, path) = path.unwrap();
-
-                            match path {
-                                IdemPathLocalPartType::Directory(ref dir) => {
-                                    let dir = self.cwd.join(dir);
-                                    eprintln!("Checking for path {:?}", dir);
-                                    if !dir.exists() {
-                                        eprintln!("Creating path {:?}", dir);
-                                        return fs::create_dir(dir);
-                                    }
-                                },
-                                IdemPathLocalPartType::File(ref path) => {
-                                    let path = self.cwd.join(path);
-                                    eprintln!("Creating file {:?}, ignoring existing", path);
-                                    return create_ignore_existing(&path)
-                                },
-                            }
-                        }
-
-                        _ => unimplemented!("Flag keyword not implemented")
-                    }
-                };
-
-                Ok(())
-            }
-
-            _ => unimplemented!("Not implemented")
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use nom::types::CompleteStr;
@@ -110,63 +97,46 @@ mod tests {
         () => (LocalExec::with_new_relative_working_dir(&Path::new("./testing")));
     }
 
-    macro_rules!  parse (
-        ($code: expr) => ({
-            let expr = parse_raw_script(CompleteStr($code)).unwrap().1;
-            expr
-        });
-    );
-
-    #[test]
-    fn test_file_exists() {
-        let script = parse!(r#"
-./afile (exists)
-"#);
-
-        // Verify script
-        assert_eq!(script, vec![
-            IdemRawCommandType::WithPaths(IdemRawCommandWithPaths {
-                paths: vec![
-                    IdemPath(None, IdemPathLocalPartType::File("./afile".to_string())),
-                ],
-                params: vec![
-                    IdemParamType::FlagKeyword("exists".to_string()),
-                ],
-            })
-        ]);
-
-        // Execute script
-        let local_exec = local_exec!();
-        local_exec.execute_raw_script_command(&script[0]).unwrap();
-
-        // Assert result
-        assert!(Path::new("./testing/afile").is_file(), "./testing/afile does not exist or is not a file.");
-    }
+    // macro_rules!  parse (
+    //     ($code: expr) => ({
+    //         let expr = parse_raw_script(CompleteStr($code)).unwrap().1;
+    //         expr
+    //     });
+    // );
 
     #[test]
     fn test_directory_exists() {
-        let script = parse!(r#"
-./adir/ (exists)
-"#);
-
-        // Verify script
-        assert_eq!(script, vec![
-            IdemRawCommandType::WithPaths(IdemRawCommandWithPaths {
-                paths: vec![
-                    IdemPath(None, IdemPathLocalPartType::Directory("./adir".to_string())),
-                ],
-                params: vec![
-                    IdemParamType::FlagKeyword("exists".to_string()),
-                ],
-            })
-        ]);
-
         // Execute script
-        let local_exec = local_exec!();
-        local_exec.execute_raw_script_command(&script[0]).unwrap();
+        let mut local_exec = local_exec!();
 
         // Assert result
-        assert!(Path::new("./testing/adir").is_dir(), "./testing/adir does not exist or is not a directory.");
+        assert!(local_exec.ensure_directory("./afile").ok().is_some());
     }
+
+//     #[test]
+//     fn test_directory_exists() {
+//         let script = parse!(r#"
+// ./adir/ (exists)
+// "#);
+
+//         // Verify script
+//         assert_eq!(script, vec![
+//             IdemRawCommandType::WithPaths(IdemRawCommandWithPaths {
+//                 paths: vec![
+//                     IdemPath(None, IdemPathLocalPartType::Directory("./adir".to_string())),
+//                 ],
+//                 params: vec![
+//                     IdemParamType::FlagKeyword("exists".to_string()),
+//                 ],
+//             })
+//         ]);
+
+//         // Execute script
+//         let local_exec = local_exec!();
+//         local_exec.execute_raw_script_command(&script[0]).unwrap();
+
+//         // Assert result
+//         assert!(Path::new("./testing/adir").is_dir(), "./testing/adir does not exist or is not a directory.");
+//     }
 
 }
