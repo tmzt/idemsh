@@ -97,46 +97,23 @@ mod tests {
         () => (LocalExec::with_new_relative_working_dir(&Path::new("./testing")));
     }
 
-    // macro_rules!  parse (
-    //     ($code: expr) => ({
-    //         let expr = parse_raw_script(CompleteStr($code)).unwrap().1;
-    //         expr
-    //     });
-    // );
-
     #[test]
-    fn test_directory_exists() {
-        // Execute script
+    fn test_ensure_file_exists() {
         let mut local_exec = local_exec!();
 
+        assert!(local_exec.ensure_file_exists("./afile").ok().is_some());
+
         // Assert result
-        assert!(local_exec.ensure_directory("./afile").ok().is_some());
+        assert!(Path::new("./testing/afile").is_file(), "./testing/afile does not exist or is not a file.");
     }
 
-//     #[test]
-//     fn test_directory_exists() {
-//         let script = parse!(r#"
-// ./adir/ (exists)
-// "#);
+    #[test]
+    fn test_ensure_directory_exists() {
+        let mut local_exec = local_exec!();
 
-//         // Verify script
-//         assert_eq!(script, vec![
-//             IdemRawCommandType::WithPaths(IdemRawCommandWithPaths {
-//                 paths: vec![
-//                     IdemPath(None, IdemPathLocalPartType::Directory("./adir".to_string())),
-//                 ],
-//                 params: vec![
-//                     IdemParamType::FlagKeyword("exists".to_string()),
-//                 ],
-//             })
-//         ]);
+        assert!(local_exec.ensure_directory("./adir").ok().is_some());
 
-//         // Execute script
-//         let local_exec = local_exec!();
-//         local_exec.execute_raw_script_command(&script[0]).unwrap();
-
-//         // Assert result
-//         assert!(Path::new("./testing/adir").is_dir(), "./testing/adir does not exist or is not a directory.");
-//     }
-
+        // Assert result
+        assert!(Path::new("./testing/adir").is_dir(), "./testing/adir does not exist or is not a directory.");
+    }
 }

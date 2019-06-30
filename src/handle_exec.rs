@@ -29,10 +29,6 @@ fn find_single_flag_keyword(params: &[IdemParamType]) -> Option<&str> {
     }
 }
 
-// fn create_ignore_existing<T: AsRef<Path>>(path: T) -> IOResult<()> {
-//     fs::OpenOptions::new().create(true).write(true).open(path).map(|_| ())
-// }
-
 impl<'e, E: Exec> HandleExec<'e, E> {
     pub fn new(driver: &'e mut E) -> Self {
         HandleExec {
@@ -99,16 +95,6 @@ mod tests {
         }
     }
 
-    // impl Default for TestExec {
-    //     fn default() -> Self {
-    //         TestExec {
-    //             cwd: "./".to_string(),
-    //             created_dirs: vec![],
-    //             created_files: vec![],
-    //         }
-    //     }
-    // }
-
     #[inline]
     fn join_paths(a: &str, b: &str) -> String {
         let a = a.trim_end_matches("/").replace("./", "");
@@ -122,7 +108,6 @@ mod tests {
         }
 
         fn ensure_directory(&mut self, local_part: &str) -> ExecResult<()> {
-            // let dir = format!("{}/{}", &self.cwd.trim_end_matches("/"), local_part.trim_start_matches("/"));
             let dir = join_paths(&self.cwd, local_part);
             self.created_dirs.push(dir);
             Ok(())
@@ -135,7 +120,6 @@ mod tests {
         }
 
         fn ensure_file_contents(&mut self, local_part: &str, contents: FileContents) -> ExecResult<()> {
-            // let filepath = format!("{}/{}", &self.cwd.trim_end_matches("/"), local_part.trim_start_matches("/"));
             let filepath = join_paths(&self.cwd, local_part);
             self.created_files.push(filepath);
             Ok(())
@@ -145,10 +129,6 @@ mod tests {
             Ok(self.cwd.to_string())
         }
     }
-
-    // macro_rules! test_exec {
-    //     () => (TestExec::new(cwd))
-    // }
 
     macro_rules!  parse (
         ($code: expr) => ({
@@ -181,7 +161,6 @@ mod tests {
         handle_exec.execute_raw_script_command(&script[0]).unwrap();
 
         // Assert result
-        // assert!(Path::new("./testing/afile").is_file(), "./testing/afile does not exist or is not a file.");
         assert_eq!(test_exec.created_files, vec!["testing/afile"]);
     }
 
@@ -209,7 +188,6 @@ mod tests {
         handle_exec.execute_raw_script_command(&script[0]).unwrap();
 
         // Assert result
-        // assert!(Path::new("./testing/adir").is_dir(), "./testing/adir does not exist or is not a directory.");
         assert_eq!(test_exec.created_dirs, vec!["testing/adir"]);
     }
 
